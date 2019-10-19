@@ -193,7 +193,13 @@ fn main() {
     let sorting_func = opt.sorting.function();
     let mut intervals = IntervalSet::intervals_from_image(&image);
     if let Some(mask_path) = opt.mask {
-        let mask = image::open(mask_path).unwrap().to_luma();
+        let mut mask = image::open(mask_path).unwrap().to_luma();
+        match opt.rotate {
+            Rotation::Quarter => mask = imageops::rotate90(&mask),
+            Rotation::Half => mask = imageops::rotate180(&mask),
+            Rotation::NegQuarter => mask = imageops::rotate270(&mask),
+            Rotation::Zero => (),
+        }
         interval::mask(&mut intervals, &mask);
     }
 
