@@ -1,0 +1,34 @@
+[package]
+name = "pixelsort"
+version = "0.1.0"
+authors = ["Lukas Wirth <lukastw97@gmail.com>"]
+description = "Bring your pixels back in order."
+license = "MIT/Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/Veykril/pixelsort.git"
+edition = "2018"
+
+[features]
+default = ["rand"]
+
+[dependencies.rand]
+version = "0.7.2"
+optional = true
+
+[dependencies.imageproc]
+version = "0.19"
+optional = true
+
+[dependencies.image]
+version = "0.22"
+default-features = false
+features = ["jpeg", "ico", "png_codec", "pnm", "tga", "tiff", "webp", "bmp", "hdr", "dxt"]
+
+[dependencies.clap]
+version = "2.33"
+default-features = false
+features = ["suggestions", "color"]
+
+[dependencies.structopt]
+version = "0.3"
+default-features = false
