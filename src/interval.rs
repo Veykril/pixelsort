@@ -1,6 +1,6 @@
 use image::GenericImageView;
 
-use std::ops::{Bound, Range};
+use std::ops::{Bound, Range, RangeBounds};
 
 #[derive(Debug)]
 pub struct IntervalSet(Vec<Range<usize>>);
@@ -20,7 +20,7 @@ impl IntervalSet {
             .collect()
     }
 
-    pub fn pop_at(&mut self, idx: usize) -> Option<Range<usize>> {
+    pub fn pop_index(&mut self, idx: usize) -> Option<Range<usize>> {
         if idx < self.0.len() {
             Some(self.0.remove(idx))
         } else {
@@ -28,14 +28,14 @@ impl IntervalSet {
         }
     }
 
-    pub fn remove_range<R: std::ops::RangeBounds<usize>>(&mut self, range: R) {
+    pub fn remove_range<R: RangeBounds<usize>>(&mut self, range: R) {
         let start = match range.start_bound() {
-            Bound::Unbounded => 0,
+            Bound::Unbounded => self.start(),
             Bound::Included(&x) => x,
             Bound::Excluded(x) => x + 1,
         };
         let end = match range.end_bound() {
-            Bound::Unbounded => self.0.last().map(|range| range.end).unwrap_or(0),
+            Bound::Unbounded => self.end(),
             Bound::Included(x) => x + 1,
             Bound::Excluded(&x) => x,
         };
@@ -54,7 +54,7 @@ impl IntervalSet {
                     .position(|range| range.end < end)
                     .map(|pos| self.0.len() - pos)
             }) {
-                self.0.drain(left..right).for_each(|_| ());
+                for _ in self.0.drain(left..right) {}
             }
         }
     }
@@ -84,12 +84,16 @@ impl IntervalSet {
         self.0.last().map(|r| r.end).unwrap_or(0)
     }
 
+    pub fn start(&self) -> usize {
+        self.0.first().map(|r| r.start).unwrap_or(0)
+    }
+
     pub fn iter<'this>(&'this self) -> impl Iterator<Item = Range<usize>> + 'this {
         self.0.iter().cloned()
     }
 }
 
-pub fn mask(intervals: &mut Vec<IntervalSet>, mask: &image::GrayImage) {
+pub fn mask(intervals: &mut [IntervalSet], mask: &image::GrayImage) {
     for (row, set) in mask.rows().zip(intervals) {
         let mut pixels = row.enumerate();
         while let Some((last_white, _)) = pixels.find(|(_, pixel)| **pixel == image::Luma([255])) {
@@ -99,19 +103,19 @@ pub fn mask(intervals: &mut Vec<IntervalSet>, mask: &image::GrayImage) {
                     pos
                 } else {
                     if let Some((_, to_remove)) = set.split(last_white) {
-                        set.pop_at(to_remove);
+                        set.pop_index(to_remove);
                     }
                     break;
                 };
             if let Some((to_remove, _)) = set.split(first_white) {
-                set.pop_at(to_remove);
+                set.pop_index(to_remove);
             }
         }
     }
 }
 
 #[cfg(feature = "rand")]
-pub fn random(intervals: &mut Vec<IntervalSet>, lower: usize, upper: usize) {
+pub fn random(intervals: &mut [IntervalSet], lower: usize, upper: usize) {
     use rand::Rng;
     for set in intervals {
         let width = set.end();
@@ -123,7 +127,7 @@ pub fn random(intervals: &mut Vec<IntervalSet>, lower: usize, upper: usize) {
     }
 }
 
-pub fn threshold<P, I>(intervals: &mut Vec<IntervalSet>, image: &I, low: u8, high: u8)
+pub fn threshold<P, I>(intervals: &mut [IntervalSet], image: &I, low: u8, high: u8)
 where
     P: image::Pixel<Subpixel = u8>,
     I: GenericImageView<Pixel = P>,
@@ -139,18 +143,19 @@ where
     mask(intervals, &gray);
 }
 
-pub fn split_equal(intervals: &mut Vec<IntervalSet>, part_count: usize) {
-    let width = intervals.len() / part_count;
-    for set in intervals {
-        for id in 0..part_count {
-            set.split(id * width);
+pub fn split_equal(intervals: &mut [IntervalSet], part_count: usize) {
+    if let Some(width) = intervals.len().checked_div(part_count) {
+        for set in intervals {
+            for id in 0..part_count {
+                set.split(id * width);
+            }
         }
     }
 }
 
 #[cfg(feature = "imageproc")]
 pub fn edges_canny<P, I>(
-    intervals: &mut Vec<IntervalSet>,
+    intervals: &mut [IntervalSet],
     image: &I,
     low_thresh: f32,
     high_thresh: f32,

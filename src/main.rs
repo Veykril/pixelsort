@@ -1,10 +1,11 @@
 use image::imageops;
-use pixelsort::interval::{self, IntervalSet};
-use pixelsort::sorting;
 use structopt::StructOpt;
 
 use std::path::PathBuf;
 use std::str;
+
+use pixelsort::interval::{self, IntervalSet};
+use pixelsort::sorting;
 
 #[derive(StructOpt)]
 #[structopt(author)]
@@ -72,6 +73,15 @@ struct Opt {
                      To sort vertically instead of horizontally for example one would specifiy a rotation of 90 or 270 degrees."
     )]
     rotate: Rotation,
+    #[structopt(
+        short,
+        required_if("interval_function", "split"),
+        help = "The number of parts to split the intervals into.",
+        long_help = "The number of parts to split the intervals into.\n\
+                     \n\
+                     Required by interval function `split`, splits the file into even intervals."
+    )]
+    num: usize,
     #[structopt(
         short,
         long,
@@ -152,6 +162,7 @@ pub enum IntervalFunction {
     #[cfg(feature = "rand")]
     Random,
     Threshold,
+    SplitEqual,
 }
 
 impl str::FromStr for IntervalFunction {
@@ -164,6 +175,7 @@ impl str::FromStr for IntervalFunction {
             #[cfg(feature = "rand")]
             "random" => Ok(IntervalFunction::Random),
             "threshold" => Ok(IntervalFunction::Threshold),
+            "split" => Ok(IntervalFunction::SplitEqual),
             _ => Err(String::from(s)),
         }
     }
@@ -205,6 +217,7 @@ fn main() {
 
     match opt.interval_function {
         IntervalFunction::Full => (),
+        IntervalFunction::SplitEqual => interval::split_equal(&mut intervals, opt.num),
         #[cfg(feature = "imageproc")]
         IntervalFunction::Edges => {
             interval::edges_canny(&mut intervals, &image, opt.lower, opt.upper)
