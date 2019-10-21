@@ -28,7 +28,3 @@ features = ["jpeg", "ico", "png_codec", "pnm", "tga", "tiff", "webp", "bmp", "hd
 version = "2.33"
 default-features = false
 features = ["suggestions", "color"]
-
-[dependencies.structopt]
-version = "0.3"
-default-features = false
