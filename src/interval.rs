@@ -28,6 +28,8 @@ impl IntervalSet {
         }
     }
 
+    // FIXME: wont work for ranges whose start and end point are inside of
+    // self.full_range but which arent inside of any of the contained ranges
     pub fn remove_range<R: RangeBounds<usize>>(&mut self, range: R) {
         let start = match range.start_bound() {
             Bound::Unbounded => self.start(),
@@ -42,42 +44,41 @@ impl IntervalSet {
         if end <= start {
             return;
         }
-        if let Some(left) = self
-            .split(start)
-            .map(|(_, pos)| pos)
-            .or_else(|| self.0.iter().position(|range| range.start > start))
-        {
-            if let Some(right) = self.split(end).map(|(_, pos)| pos).or_else(|| {
-                self.0
-                    .iter()
-                    .rev()
-                    .position(|range| range.end < end)
-                    .map(|pos| self.0.len() - pos)
-            }) {
-                for _ in self.0.drain(left..right) {}
+        let remove_range = match (self.split_at(start), self.split_at(end)) {
+            (Some((_, pos)), Some((_, end_pos))) => pos..end_pos,
+            (Some((_, pos)), None) => pos..self.0.len(),
+            (None, Some((_, pos))) => 0..pos,
+            // FIXME: this case is the problem
+            (None, None) => {
+                let full_range = self.full_range();
+                if full_range.start < start && end < full_range.end {
+                    // range encloses the set
+                    0..self.0.len()
+                } else {
+                    // range is outside the set
+                    return;
+                }
             }
-        }
+        };
+        self.0.drain(remove_range);
     }
 
     // returns the index of the right split off part
-    pub fn split(&mut self, at: usize) -> Option<(usize, usize)> {
+    pub fn split_at(&mut self, at: usize) -> Option<(usize, usize)> {
         let (idx, to_split) = self
             .0
             .iter_mut()
             .enumerate()
-            .find(|(_, range)| range.contains(&at))?;
-        let (first, second) = (to_split.start..at, at..to_split.end);
-        // do not insert empty ranges
-        if first.start != first.end {
-            *to_split = first;
-            if second.start != second.end {
-                self.0.insert(idx + 1, second);
-                return Some((idx, idx + 1));
-            }
-        } else if second.start != second.end {
-            *to_split = second;
+            .filter(|(_, range)| range.start <= at)
+            .last()
+            .filter(|(_, range)| at < range.end)?;
+        if to_split.start != at {
+            let end = std::mem::replace(&mut to_split.end, at);
+            self.0.insert(idx + 1, at..end);
+            Some((idx, idx + 1))
+        } else {
+            Some((idx, idx))
         }
-        Some((idx, idx))
     }
 
     pub fn end(&self) -> usize {
@@ -86,6 +87,10 @@ impl IntervalSet {
 
     pub fn start(&self) -> usize {
         self.0.first().map(|r| r.start).unwrap_or(0)
+    }
+
+    pub fn full_range(&self) -> Range<usize> {
+        self.start()..self.end()
     }
 
     pub fn iter<'this>(&'this self) -> impl Iterator<Item = Range<usize>> + 'this {
@@ -97,17 +102,17 @@ pub fn mask(intervals: &mut [IntervalSet], mask: &image::GrayImage) {
     for (row, set) in mask.rows().zip(intervals) {
         let mut pixels = row.enumerate();
         while let Some((last_white, _)) = pixels.find(|(_, pixel)| **pixel == image::Luma([255])) {
-            set.split(last_white);
+            set.split_at(last_white);
             let first_white =
                 if let Some((pos, _)) = pixels.find(|(_, pixel)| **pixel == image::Luma([0])) {
                     pos
                 } else {
-                    if let Some((_, to_remove)) = set.split(last_white) {
+                    if let Some((_, to_remove)) = set.split_at(last_white) {
                         set.pop_index(to_remove);
                     }
                     break;
                 };
-            if let Some((to_remove, _)) = set.split(first_white) {
+            if let Some((to_remove, _)) = set.split_at(first_white) {
                 set.pop_index(to_remove);
             }
         }
@@ -122,7 +127,7 @@ pub fn random(intervals: &mut [IntervalSet], lower: usize, upper: usize) {
         let mut acc = 0;
         while acc < width {
             acc += rand::thread_rng().gen_range(lower, upper);
-            set.split(acc);
+            set.split_at(acc);
         }
     }
 }
@@ -147,7 +152,7 @@ pub fn split_equal(intervals: &mut [IntervalSet], part_count: usize) {
     if let Some(width) = intervals.len().checked_div(part_count) {
         for set in intervals {
             for id in 0..part_count {
-                set.split(id * width);
+                set.split_at(id * width);
             }
         }
     }
