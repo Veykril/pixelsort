@@ -4,7 +4,8 @@ use image::imageops;
 use std::path::{Path, PathBuf};
 use std::str;
 
-use pixelsort::interval::{self, IntervalSet};
+use inversion_list::InversionList;
+use pixelsort::interval_func;
 use pixelsort::sorting;
 
 #[derive(Clone, Copy)]
@@ -146,7 +147,7 @@ fn main() {
     let interval_func =
         IntervalFunction::from_str(matches.value_of("interval_func").unwrap()).unwrap();
 
-    let mut intervals = IntervalSet::intervals_from_image(&image);
+    let mut intervals = intervals_from_image(&image);
     if let Some(mask_path) = matches.value_of_os("mask").map(Path::new) {
         let mut mask = image::open(mask_path).unwrap().to_luma();
         match rotate {
@@ -155,7 +156,7 @@ fn main() {
             Rotation::NegQuarter => mask = imageops::rotate270(&mask),
             Rotation::Zero => (),
         }
-        interval::mask(&mut intervals, &mask);
+        interval_func::mask(&mut intervals, &mask);
     }
 
     let upper = matches.value_of("upper").unwrap_or_default();
@@ -163,7 +164,7 @@ fn main() {
 
     match interval_func {
         IntervalFunction::Full => (),
-        IntervalFunction::SplitEqual => interval::split_equal(
+        IntervalFunction::SplitEqual => interval_func::split_equal(
             &mut intervals,
             matches
                 .value_of("num")
@@ -172,19 +173,19 @@ fn main() {
                 .expect("num was not an integer"),
         ),
         #[cfg(feature = "imageproc")]
-        IntervalFunction::Edges => interval::edges_canny(
+        IntervalFunction::Edges => interval_func::edges_canny(
             &mut intervals,
             &image,
             lower.parse().expect("lower was not an float"),
             upper.parse().expect("upper was not an float"),
         ),
         #[cfg(feature = "rand")]
-        IntervalFunction::Random => interval::random(
+        IntervalFunction::Random => interval_func::random(
             &mut intervals,
             lower.parse().expect("lower was not an integer"),
             upper.parse().expect("upper was not an integer"),
         ),
-        IntervalFunction::Threshold => interval::threshold(
+        IntervalFunction::Threshold => interval_func::threshold(
             &mut intervals,
             &image,
             lower.parse().expect("lower was not a byte integer"),
@@ -305,4 +306,10 @@ fn arg_interval() -> Arg<'static, 'static> {
         .possible_values(&["full", "edge", "random", "split", "threshold"])
         .default_value("full")
         .takes_value(true)
+}
+
+pub fn intervals_from_image<I: image::GenericImageView>(image: &I) -> Vec<InversionList> {
+    (0..image.height())
+        .map(|_| InversionList::from(0..image.width() as usize))
+        .collect()
 }

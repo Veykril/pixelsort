@@ -9,22 +9,26 @@ repository = "https://github.com/Veykril/pixelsort.git"
 edition = "2018"
 
 [features]
-default = ["rand"]
+default = ["rand", "imageproc"]
 
 [dependencies.rand]
-version = "0.7.2"
+version = "0.7"
 optional = true
 
 [dependencies.imageproc]
-version = "0.19"
+version = "0.20"
 optional = true
 
 [dependencies.image]
-version = "0.22"
+version = "0.23"
 default-features = false
-features = ["jpeg", "ico", "png_codec", "pnm", "tga", "tiff", "webp", "bmp", "hdr", "dxt"]
+features = ["jpeg", "png"]
 
 [dependencies.clap]
 version = "2.33"
 default-features = false
 features = ["suggestions", "color"]
+
+[dependencies.inversion-list]
+git = "https://github.com/Veykril/inversion-list"
+rev = "f04eb0550b10d40a3bff72daf70b06d539ab9cdb"

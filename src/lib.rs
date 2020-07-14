@@ -2,10 +2,10 @@ use image::{GenericImage, GenericImageView, Pixel};
 
 pub mod sorting;
 
-pub mod interval;
-use self::interval::IntervalSet;
+pub mod interval_func;
+use inversion_list::InversionList;
 
-pub fn sort_image<I, P, SF>(image: &mut I, intervals: Vec<IntervalSet>, sorting_function: SF)
+pub fn sort_image<I, P, SF>(image: &mut I, intervals: Vec<InversionList>, sorting_function: SF)
 where
     I: GenericImage + GenericImageView<Pixel = P>,
     P: Pixel<Subpixel = u8>,
@@ -18,7 +18,7 @@ where
         .enumerate()
         .take(image.height() as usize)
     {
-        for range in set.iter() {
+        for range in set.ranges() {
             let mut sub = image.sub_image(
                 range.start as u32,
                 row as u32,
